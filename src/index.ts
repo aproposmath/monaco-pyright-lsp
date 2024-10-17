@@ -1,16 +1,16 @@
 
 import { } from "pyright/packages/pyright-internal/src/server";
-import { BrowserMessageReader, BrowserMessageWriter, createMessageConnection, DataCallback, Disposable, Event, MessageReader, PartialMessageInfo, SharedArraySenderStrategy, SharedArrayReceiverStrategy, MessageConnection, CompletionList, CompletionItem, NotificationType, DidChangeTextDocumentParams, CompletionParams, Position, CompletionRequest, CompletionResolveRequest, InitializeParams, DiagnosticTag, InitializeRequest, DidChangeConfigurationParams, DidOpenTextDocumentParams, PublishDiagnosticsParams, Diagnostic, LogMessageParams, ConfigurationParams, RequestType, HoverParams, HoverRequest, SignatureHelpParams, SignatureHelpRequest, SignatureHelp, Hover } from "vscode-languageserver/browser";
+import { BrowserMessageReader, BrowserMessageWriter, createMessageConnection, DataCallback, Disposable, Event, MessageReader, PartialMessageInfo, SharedArraySenderStrategy, SharedArrayReceiverStrategy, MessageConnection, CompletionList, CompletionItem, NotificationType, DidChangeTextDocumentParams, CompletionParams, Position, CompletionRequest, CompletionResolveRequest, InitializeParams, DiagnosticTag, InitializeRequest, DidChangeConfigurationParams, DidOpenTextDocumentParams, PublishDiagnosticsParams, Diagnostic, LogMessageParams, ConfigurationParams, RequestType, HoverParams, HoverRequest, SignatureHelpParams, SignatureHelpRequest, SignatureHelp, Hover, DidChangeConfigurationNotification } from "vscode-languageserver/browser";
 import * as BrowserFS from "browserfs";
-BrowserFS.configure({
-    fs: "MountableFileSystem",
-    options: {
-        "/": { fs: "InMemory" },
-    }
-}, function (e)
-{
+// BrowserFS.configure({
+//     fs: "MountableFileSystem",
+//     options: {
+//         "/": { fs: "InMemory" },
+//     }
+// }, function (e)
+// {
 
-})
+// })
 
 declare global
 {
@@ -30,19 +30,35 @@ interface DiagnosticRequest
 
 export class LspClient
 {
-    connection: MessageConnection;
+    connection: MessageConnection = null as any;
     docVersion = 1;
     lastDoc = "";
+    worker: Worker;
+    workerInitPromise: Promise<void>;
     private _documentDiags: PublishDiagnosticsParams | undefined;
     private _pendingDiagRequests = new Map<number, DiagnosticRequest[]>();
 
     constructor(worker_url: string)
     {
+        this.worker = new Worker(worker_url);
+        this.workerInitPromise = new Promise((resolve) =>
+        {
+            this.worker.onmessage = (msg) =>
+            {
+                if (msg.data === "INITIALIZED")
+                {
+                    resolve();
+                }
+            }
+        })
+    }
+    
+    public async initialize(projectPath: string)
+    {
+        await this.workerInitPromise;
 
-        const worker = new Worker(worker_url);
-
-        const reader = new BrowserMessageReader(worker);
-        const writer = new BrowserMessageWriter(worker);
+        const reader = new BrowserMessageReader(this.worker);
+        const writer = new BrowserMessageWriter(this.worker);
 
         this.connection = createMessageConnection(reader, writer, console, {
             // cancellationStrategy: {
@@ -52,10 +68,6 @@ export class LspClient
         });
 
         this.connection.listen();
-    }
-    
-    public async initialize(projectPath: string)
-    {
         // Initialize the server.
         const init: InitializeParams = {
             rootUri: `file://${projectPath}`,
@@ -297,6 +309,24 @@ export class LspClient
                 },
             });
         });
+    }
+
+    async updateSettings(): Promise<void>
+    {
+        await this.connection
+            .sendNotification(DidChangeConfigurationNotification.type, {
+                settings: {
+                    python: {
+                        analysis: {
+                            typeshedPaths: [
+                                "/typeshed-fallback"
+                            ]
+                        },
+                        pythonVersion: "3.13",
+                        pythonPlatform: "All",
+                    }
+                    }
+            });
     }
 
     // Sends a new version of the text document to the language server.

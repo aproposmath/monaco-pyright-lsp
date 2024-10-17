@@ -7,22 +7,40 @@ import { CompletionItem, CompletionItemKind, CompletionList, Hover, InsertReplac
 
 
 const lspClient = new LspClient('worker.js');
-lspClient.initialize("/");
+// lspClient.initialize("/");
 
-monaco.languages.registerHoverProvider('python', {
-    provideHover: handleHoverRequest,
-});
+async function init()
+{
+    console.log("initialize");
+    await lspClient.initialize("/");
+    console.log("client initialized")
 
-monaco.languages.registerCompletionItemProvider('python', {
-    provideCompletionItems: handleProvideCompletionRequest,
-    resolveCompletionItem: handleResolveCompletionRequest,
-    triggerCharacters: ['.', '[', '"', "'"],
-});
+    await lspClient.updateSettings();
 
-monaco.languages.registerSignatureHelpProvider('python', {
-    provideSignatureHelp: handleSignatureHelpRequest,
-    signatureHelpTriggerCharacters: ['(', ','],
-});
+    monaco.languages.registerHoverProvider('python', {
+        provideHover: handleHoverRequest,
+    });
+
+    monaco.languages.registerCompletionItemProvider('python', {
+        provideCompletionItems: handleProvideCompletionRequest,
+        resolveCompletionItem: handleResolveCompletionRequest,
+        triggerCharacters: ['.', '[', '"', "'"],
+    });
+
+    monaco.languages.registerSignatureHelpProvider('python', {
+        provideSignatureHelp: handleSignatureHelpRequest,
+        signatureHelpTriggerCharacters: ['(', ','],
+    });
+
+
+
+    monaco.editor.create(document.querySelector("#editor") as HTMLElement, {
+        value: 'print("Hello World!")\ndef add(a: int, b: float) -> float: \n    return a + b\nx = add(1, 2)',
+        language: "python",
+    });
+}
+init();
+
 
 async function handleSignatureHelpRequest(
     model: monaco.editor.ITextModel,
@@ -238,8 +256,3 @@ function convertCompletionItemKind(
             return monaco.languages.CompletionItemKind.Reference;
     }
 }
-
-monaco.editor.create(document.querySelector("#editor") as HTMLElement, {
-    value: 'print("Hello World!")\n',
-    language: "python",
-});
