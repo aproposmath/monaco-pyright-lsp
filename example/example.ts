@@ -2,12 +2,16 @@ import * as monaco from "monaco-editor";
 import {  } from "monaco-editor";
 import "./style.css";
 import { LspClient } from "../src/index";
-import { CompletionItem, CompletionItemKind, CompletionList, InsertReplaceEdit, ParameterInformation, Range, SignatureHelp, SignatureInformation } from "vscode-languageserver";
+import { CompletionItem, CompletionItemKind, CompletionList, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation } from "vscode-languageserver";
 
 
 
 const lspClient = new LspClient('worker.js');
 lspClient.initialize("/");
+
+monaco.languages.registerHoverProvider('python', {
+    provideHover: handleHoverRequest,
+});
 
 monaco.languages.registerCompletionItemProvider('python', {
     provideCompletionItems: handleProvideCompletionRequest,
@@ -52,6 +56,37 @@ async function handleSignatureHelpRequest(
                 activeParameter: sigInfo.activeParameter as number,
             },
             dispose: () => { },
+        };
+    } catch (err)
+    {
+        return null as any;
+    }
+}
+
+async function handleHoverRequest(
+    model: monaco.editor.ITextModel,
+    position: monaco.Position
+): Promise<monaco.languages.Hover>
+{
+    if (!lspClient)
+    {
+        return null as any;
+    }
+
+    try
+    {
+        const hoverInfo = await lspClient.getHoverInfo(model.getValue(), {
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+        }) as Hover;
+
+        return {
+            contents: [
+                {
+                    value: (hoverInfo.contents as MarkupContent).value,
+                },
+            ],
+            range: convertRange(hoverInfo.range as Range),
         };
     } catch (err)
     {
