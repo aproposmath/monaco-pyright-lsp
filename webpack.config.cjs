@@ -73,7 +73,7 @@ const config = {
     resolve: {
         extensions: ['.tsx', '.ts', '.jsx', '.js', '...'],
         alias: {
-            'tmp': path.resolve("./src/pollyfills/tmp.js"),
+            // 'tmp': path.resolve("./src/pollyfills/tmp.js"),
             'fs': require.resolve('@zenfs/core'),
             // 'buffer': '@zenfs/core/dist/shims/buffer.js',
             // 'path': '@zenfs/core/dist/shims/path.js',

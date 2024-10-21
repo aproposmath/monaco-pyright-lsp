@@ -1,358 +1,250 @@
-import "./pollyfills/process.patch.js";
-import { } from "pyright/packages/pyright-internal/src/server";
-import { BrowserMessageReader, BrowserMessageWriter, createMessageConnection, DataCallback, Disposable, Event, MessageReader, PartialMessageInfo, SharedArraySenderStrategy, SharedArrayReceiverStrategy, MessageConnection, CompletionList, CompletionItem, NotificationType, DidChangeTextDocumentParams, CompletionParams, Position, CompletionRequest, CompletionResolveRequest, InitializeParams, DiagnosticTag, InitializeRequest, DidChangeConfigurationParams, DidOpenTextDocumentParams, PublishDiagnosticsParams, Diagnostic, LogMessageParams, ConfigurationParams, RequestType, HoverParams, HoverRequest, SignatureHelpParams, SignatureHelpRequest, SignatureHelp, Hover, DidChangeConfigurationNotification } from "vscode-languageserver/browser";
+import { LspClient } from "./client";
+import _monaco, { editor, Position, languages, IRange } from "monaco-editor";
+import { CompletionItem, CompletionItemKind, CompletionList, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation } from "vscode-languageserver";
 
+type MonacoModule = typeof _monaco;
 
-declare global
+interface MonacoPyrightProviderOptions
 {
-    interface Promise<T>
-    {
-        ignoreErrors(): void
+    hover: boolean,
+    completion: boolean,
+    signatureHelp: boolean,
+    diagnostic: boolean,
+    rename: boolean,
+}
+
+const defaultOptions: MonacoPyrightProviderOptions = {
+    hover: true,
+    completion: true,
+    signatureHelp: true,
+    diagnostic: true,
+    rename: true,
+
+};
+
+export class MonacoPyrightProvider
+{
+    lspClient: LspClient;
+
+
+    public constructor(workerUrl: string)
+    { 
+        this.lspClient = new LspClient(workerUrl);
     }
-}
 
-
-const documentUri = 'file:///Untitled.py';
-
-interface DiagnosticRequest
-{
-    callback: (diags: Diagnostic[], error?: Error) => void;
-}
-
-export class LspClient
-{
-    connection: MessageConnection = null as any;
-    docVersion = 1;
-    lastDoc = "";
-    worker: Worker;
-    workerInitPromise: Promise<void>;
-    private _documentDiags: PublishDiagnosticsParams | undefined;
-    private _pendingDiagRequests = new Map<number, DiagnosticRequest[]>();
-
-    constructor(worker_url: string)
+    async init(monacoModule: MonacoModule, options?: Partial<MonacoPyrightProviderOptions>)
     {
-        this.worker = new Worker(worker_url);
-        this.workerInitPromise = new Promise((resolve) =>
+        await this.lspClient.initialize("/");
+        await this.lspClient.updateSettings();
+
+        const finalOptions = Object.assign(defaultOptions, options || {});
+        if (finalOptions.hover)
         {
-            this.worker.onmessage = (msg) =>
-            {
-                if (msg.data === "INITIALIZED")
-                {
-                    resolve();
-                }
-            }
-        })
-    }
-    
-    public async initialize(projectPath: string)
-    {
-        await this.workerInitPromise;
+            monacoModule.languages.registerHoverProvider('python', {
+                provideHover: this.onHover.bind(this),
+            });
+        }
 
-        const reader = new BrowserMessageReader(this.worker);
-        const writer = new BrowserMessageWriter(this.worker);
+        if (finalOptions.completion)
+        {
+            monacoModule.languages.registerCompletionItemProvider('python', {
+                provideCompletionItems: this.onCompletionRequest.bind(this),
+                resolveCompletionItem: this.onResolveCompletion.bind(this),
+                triggerCharacters: ['.', '[', '"', "'"],
+            });
+        }
 
-        this.connection = createMessageConnection(reader, writer, console, {
-            // cancellationStrategy: {
-            //     sender: new SharedArraySenderStrategy(),
-            //     receiver: new SharedArrayReceiverStrategy()
-            // }
-        });
-
-        this.connection.listen();
-        // Initialize the server.
-        const init: InitializeParams = {
-            rootUri: `file://${projectPath}`,
-            rootPath: projectPath,
-            processId: 1,
-            capabilities: {
-                textDocument: {
-                    publishDiagnostics: {
-                        tagSupport: {
-                            valueSet: [DiagnosticTag.Unnecessary, DiagnosticTag.Deprecated],
-                        },
-                        versionSupport: true,
-                    },
-                    hover: {
-                        contentFormat: ['markdown', 'plaintext'],
-                    },
-                    signatureHelp: {},
-                },
-            },
-        };
-
-
-        this.docVersion = 1;
-        this.lastDoc = "";
-
-        await this.connection.sendRequest(InitializeRequest.type, init);
-
-        // Update the settings.
-        await this.connection.sendNotification(
-            new NotificationType<DidChangeConfigurationParams>('workspace/didChangeConfiguration'),
-            {
-                settings: {},
-            }
-        );
-
-        // Simulate an "open file" event.
-        await this.connection.sendNotification(
-            new NotificationType<DidOpenTextDocumentParams>('textDocument/didOpen'),
-            {
-                textDocument: {
-                    uri: documentUri,
-                    languageId: 'python',
-                    version: this.docVersion,
-                    text: this.lastDoc,
-                },
-            }
-        );
-
-        // Receive diagnostics from the language server.
-        this.connection.onNotification(
-            new NotificationType<PublishDiagnosticsParams>('textDocument/publishDiagnostics'),
-            (diagInfo) =>
-            {
-                const diagVersion = diagInfo.version ?? -1;
-
-                console.info(`Received diagnostics for version: ${diagVersion}`);
-
-                // Update the cached diagnostics.
-                if (
-                    this._documentDiags === undefined ||
-                    this._documentDiags.version! < diagVersion
-                )
-                {
-                    this._documentDiags = diagInfo;
-                }
-
-                // Resolve any pending diagnostic requests.
-                const pendingRequests = this._pendingDiagRequests.get(diagVersion) ?? [];
-                this._pendingDiagRequests.delete(diagVersion);
-
-                for (const request of pendingRequests)
-                {
-                    request.callback(diagInfo.diagnostics);
-                }
-            }
-        );
-
-        // Log messages received by the language server for debugging purposes.
-        this.connection.onNotification(
-            new NotificationType<LogMessageParams>('window/logMessage'),
-            (info) =>
-            {
-                console.info(`Language server log message: ${info.message}`);
-            }
-        );
-
-        // Handle requests for configurations.
-        this.connection.onRequest(
-            new RequestType<ConfigurationParams, any, any>('workspace/configuration'),
-            (params) =>
-            {
-                console.info(`Language server config request: ${JSON.stringify(params)}}`);
-                return [];
-            }
-        );
+        if (finalOptions.signatureHelp)
+        {
+            monacoModule.languages.registerSignatureHelpProvider('python', {
+                provideSignatureHelp: this.onSignatureHelp.bind(this),
+                signatureHelpTriggerCharacters: ['(', ','],
+            });
+        }
     }
 
-    async getCompletion(
-        code: string,
+    async onSignatureHelp(
+        model: editor.ITextModel,
         position: Position
-    ): Promise<CompletionList | CompletionItem[] | null>
+    ): Promise<languages.SignatureHelpResult>
     {
-        let documentVersion = this.docVersion;
-        if (this.lastDoc !== code)
-        {
-            documentVersion = await this.updateTextDocument(code);
-        }
+        const sigInfo = await this.lspClient.getSignatureHelp(model.getValue(), {
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+        }) as SignatureHelp;
 
-        const params: CompletionParams = {
-            textDocument: {
-                uri: documentUri,
-            },
-            position,
-        };
-
-        console.log("Request completion");
-
-        const result = await this.connection
-            .sendRequest(CompletionRequest.type, params)
-            .catch((err) =>
-            {
-                // Don't return an error. Just return null (no info).
-                return null;
-            });
-        
-        console.log("Get result", result);
-
-        return result;
-    }
-
-    async resolveCompletion(completionItem: CompletionItem): Promise<CompletionItem | null>
-    {
-        const result = await this.connection
-            .sendRequest(CompletionResolveRequest.type, completionItem)
-            .catch((err) =>
-            {
-                // Don't return an error. Just return null (no info).
-                return null;
-            });
-
-        return result;
-    }
-
-    async getHoverInfo(code: string, position: Position): Promise<Hover | null>
-    {
-        let documentVersion = this.docVersion;
-        if (this.lastDoc !== code)
-        {
-            documentVersion = await this.updateTextDocument(code);
-        }
-
-        const params: HoverParams = {
-            textDocument: {
-                uri: documentUri,
-            },
-            position,
-        };
-
-        const result = await this.connection
-            .sendRequest(HoverRequest.type, params)
-            .catch((err) =>
-            {
-                // Don't return an error. Just return null (no info).
-                return null;
-            });
-
-        return result;
-    }
-
-    async getSignatureHelp(code: string, position: Position): Promise<SignatureHelp | null>
-    {
-        let documentVersion = this.docVersion;
-        if (this.lastDoc !== code)
-        {
-            documentVersion = await this.updateTextDocument(code);
-        }
-
-        const params: SignatureHelpParams = {
-            textDocument: {
-                uri: documentUri,
-            },
-            position,
-        };
-
-        const result = await this.connection
-            .sendRequest(SignatureHelpRequest.type, params)
-            .catch((err) =>
-            {
-                // Don't return an error. Just return null (no info).
-                return null;
-            });
-        
-        console.log("signature help", result);
-
-        return result;
-    }
-
-    async getDiagnostics(code: string): Promise<Diagnostic[]>
-    {
-        const codeChanged = this.lastDoc !== code;
-
-        // If the code hasn't changed since the last time we received
-        // a code update, return the cached diagnostics.
-        if (!codeChanged && this._documentDiags)
-        {
-            return this._documentDiags.diagnostics;
-        }
-
-        // The diagnostics will come back asynchronously, so
-        // return a promise.
-        return new Promise<Diagnostic[]>(async (resolve, reject) =>
-        {
-            let documentVersion = this.docVersion;
-
-            if (codeChanged)
-            {
-                documentVersion = await this.updateTextDocument(code);
-            }
-
-            // Queue a request for diagnostics.
-            let requestList = this._pendingDiagRequests.get(documentVersion);
-            if (!requestList)
-            {
-                requestList = [];
-                this._pendingDiagRequests.set(documentVersion, requestList);
-            }
-
-            requestList.push({
-                callback: (diagnostics, err) =>
+        return {
+            value: {
+                signatures: sigInfo.signatures.map((sig) =>
                 {
-                    if (err)
-                    {
-                        reject(err);
-                        return;
-                    }
+                    return {
+                        label: sig.label,
+                        documentation: sig.documentation,
+                        parameters: sig.parameters as ParameterInformation[],
+                        activeParameter: sig.activeParameter as number,
+                    };
+                }),
+                activeSignature: sigInfo.activeSignature as number,
+                activeParameter: sigInfo.activeParameter as number,
+            },
+            dispose: () => { },
+        };
+    }
 
-                    console.info(`Diagnostic callback ${JSON.stringify(diagnostics)}}`);
-                    resolve(diagnostics);
+    async onHover(
+        model: editor.ITextModel,
+        position: Position
+    ): Promise<languages.Hover>
+    {
+        const hoverInfo = await this.lspClient.getHoverInfo(model.getValue(), {
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+        }) as Hover;
+
+        return {
+            contents: [
+                {
+                    value: (hoverInfo.contents as MarkupContent).value,
                 },
-            });
-        });
+            ],
+            range: this.convertRange(hoverInfo.range as Range),
+        };
     }
 
-    async updateSettings(): Promise<void>
+    async onCompletionRequest(
+        model: editor.ITextModel,
+        position: Position
+    ): Promise<languages.CompletionList>
     {
-        await this.connection
-            .sendNotification(DidChangeConfigurationNotification.type, {
-                settings: {
-                    python: {
-                        analysis: {
-                            typeshedPaths: [
-                                "/typeshed-fallback"
-                            ]
-                        },
-                        pythonVersion: "3.13",
-                        pythonPlatform: "All",
-                    }
-                    }
-            });
+        const completionInfo = await this.lspClient.getCompletion(model.getValue(), {
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+        }) as CompletionList;
+
+        console.log(completionInfo);
+
+        return {
+            suggestions: completionInfo.items.map((item) =>
+            {
+                return this.convertCompletionItem(item, model);
+            }),
+            incomplete: completionInfo.isIncomplete,
+            dispose: () => { },
+        };
     }
 
-    // Sends a new version of the text document to the language server.
-    // It bumps the document version and returns the new version number.
-    private async updateTextDocument(code: string): Promise<number>
+    async onResolveCompletion(
+        item: languages.CompletionItem
+    ): Promise<languages.CompletionItem>
     {
-        ++this.docVersion;
-        console.info(`Updating text document to version ${this.docVersion}`);
+        const model = (item as ExtendedCompletionItem).__model;
+        const original = (item as ExtendedCompletionItem).__original;
 
-        // Send the updated text to the language server.
-        return this.connection
-            .sendNotification(
-                new NotificationType<DidChangeTextDocumentParams>('textDocument/didChange'),
-                {
-                    textDocument: {
-                        uri: documentUri,
-                        version: this.docVersion,
-                    },
-                    contentChanges: [
-                        {
-                            text: code,
-                        },
-                    ],
-                }
-            )
-            .then(() =>
-            {
-                console.info(`Successfully sent text document to language server`);
-                return this.docVersion;
-            })
-            .catch((err) =>
-            {
-                console.error(`Error sending text document to language server: ${err}`);
-                throw err;
-            });
+        if (!model || !original)
+        {
+            return null as any;
+        }
+
+        const result = await this.lspClient.resolveCompletion(original);
+        return this.convertCompletionItem(result as CompletionItem);
     }
+
+    convertCompletionItem(
+        item: CompletionItem,
+        model?: editor.ITextModel
+    ): languages.CompletionItem
+    {
+        const converted: languages.CompletionItem = {
+            label: item.label,
+            kind: this.convertCompletionItemKind(item.kind as CompletionItemKind),
+            tags: item.tags,
+            detail: item.detail,
+            documentation: item.documentation,
+            sortText: item.sortText,
+            filterText: item.filterText,
+            preselect: item.preselect,
+            insertText: item.label,
+            range: undefined as any,
+        };
+
+        if (item.textEdit)
+        {
+            converted.insertText = item.textEdit.newText;
+            if (InsertReplaceEdit.is(item.textEdit))
+            {
+                converted.range = {
+                    insert: this.convertRange(item.textEdit.insert),
+                    replace: this.convertRange(item.textEdit.replace),
+                };
+            }
+            else
+            {
+                converted.range = this.convertRange(item.textEdit.range);
+            }
+        }
+
+        if (item.additionalTextEdits)
+        {
+            converted.additionalTextEdits = item.additionalTextEdits.map((edit) =>
+            {
+                return {
+                    range: this.convertRange(edit.range),
+                    text: edit.newText,
+                };
+            });
+        }
+
+        // Stash a few additional pieces of information.
+        (converted as ExtendedCompletionItem).__original = item;
+        if (model)
+        {
+            (converted as ExtendedCompletionItem).__model = model;
+        }
+
+        return converted;
+    }
+
+    convertRange(range: Range): IRange
+    {
+        return {
+            startLineNumber: range.start.line + 1,
+            startColumn: range.start.character + 1,
+            endLineNumber: range.end.line + 1,
+            endColumn: range.end.character + 1,
+        };
+    }
+
+
+    convertCompletionItemKind(
+        itemKind: CompletionItemKind
+    ): languages.CompletionItemKind
+    {
+        switch (itemKind)
+        {
+            case CompletionItemKind.Constant:
+                return languages.CompletionItemKind.Constant;
+
+            case CompletionItemKind.Variable:
+                return languages.CompletionItemKind.Variable;
+
+            case CompletionItemKind.Function:
+                return languages.CompletionItemKind.Function;
+
+            case CompletionItemKind.Field:
+                return languages.CompletionItemKind.Field;
+
+            case CompletionItemKind.Keyword:
+                return languages.CompletionItemKind.Keyword;
+
+            default:
+                return languages.CompletionItemKind.Reference;
+        }
+    }
+
 }
 
+interface ExtendedCompletionItem extends CompletionItem
+{
+    __original?: CompletionItem,
+    __model?: editor.ITextModel,
+}

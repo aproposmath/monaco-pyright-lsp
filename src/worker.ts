@@ -1,4 +1,6 @@
-import "./pollyfills/process.patch.js";
+import "./polyfills/process.patch";
+import "./polyfills/fs.patch";
+
 import { createFromRealFileSystem, RealTempFile } from "pyright/packages/pyright-internal/src/common/realFileSystem";
 import { PyrightFileSystem } from "pyright/packages/pyright-internal/src/pyrightFileSystem";
 import { PyrightServer } from "pyright/packages/pyright-internal/src/server";
@@ -33,27 +35,6 @@ async function initFs()
 async function init()
 {
     await initFs();
-
-    // const configFilePath = path.join("/", 'pyrightconfig.json');
-    // const config: any = {};
-
-    // config.pythonVersion = "3.13";
-
-    // config.pythonPlatform = "All";
-
-    // config.typeCheckingMode = 'strict';
-
-    // config.venvPath = '.';
-    // config.venv = 'venv';
-
-    // const configJson = JSON.stringify(config);
-    // // fs.writeFileSync(configFilePath, configJson);
-
-    // console.log(fs.readdirSync("."));
-
-    // // setInterval(() => {
-    // //     console.log(fs.readdirSync("/"));
-    // // }, 1000);
 
 
     const reader = new BrowserMessageReader(self as any);
