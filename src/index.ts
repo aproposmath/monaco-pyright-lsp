@@ -1,5 +1,5 @@
 import { LspClient } from "./client";
-import _monaco, { editor, Position, languages, IRange, CancellationToken } from "monaco-editor";
+import _monaco, { editor, Position, languages, IRange, CancellationToken, IMarkdownString } from "monaco-editor";
 import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri } from "vscode-languageserver";
 
 type MonacoModule = typeof _monaco;
@@ -108,12 +108,16 @@ export class MonacoPyrightProvider
     async onSignatureHelp(
         model: editor.ITextModel,
         position: Position
-    ): Promise<languages.SignatureHelpResult>
+    ): Promise<languages.SignatureHelpResult | null>
     {
         const sigInfo = await this.lspClient.getSignatureHelp(model.getValue(), {
             line: position.lineNumber - 1,
             character: position.column - 1,
-        }) as SignatureHelp;
+        });
+
+        if (!sigInfo)
+            return null;
+
 
         return {
             value: {
@@ -136,12 +140,15 @@ export class MonacoPyrightProvider
     async onHover(
         model: editor.ITextModel,
         position: Position
-    ): Promise<languages.Hover>
+    ): Promise<languages.Hover | null>
     {
         const hoverInfo = await this.lspClient.getHoverInfo(model.getValue(), {
             line: position.lineNumber - 1,
             character: position.column - 1,
-        }) as Hover;
+        });
+
+        if (!hoverInfo)
+            return null;
 
         return {
             contents: [
