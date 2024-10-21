@@ -1,7 +1,7 @@
 import * as monaco from "monaco-editor";
 import {  } from "monaco-editor";
 import "./style.css";
-import { LspClient } from "../src/index";
+import { LspClient } from "../src";
 import { CompletionItem, CompletionItemKind, CompletionList, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation } from "vscode-languageserver";
 
 

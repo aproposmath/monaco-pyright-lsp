@@ -35,7 +35,7 @@ const config = {
             ]
         }),
         new Dotenv(),
-        new webpack.ProvidePlugin({ BrowserFS: 'bfsGlobal', process: 'processGlobal', Buffer: 'bufferGlobal' }),
+        new webpack.ProvidePlugin({ process: 'process/browser', Buffer: ['buffer', 'Buffer'] }),
         new webpack.DefinePlugin({
             "__fs_constants": JSON.stringify(fs.constants),
             "__os_constants": JSON.stringify(os.constants),
@@ -74,11 +74,11 @@ const config = {
         extensions: ['.tsx', '.ts', '.jsx', '.js', '...'],
         alias: {
             'tmp': path.resolve("./src/pollyfills/tmp.js"),
-            'fs': 'browserfs/dist/shims/fs.js',
-            'buffer': 'browserfs/dist/shims/buffer.js',
-            'path': 'browserfs/dist/shims/path.js',
-            'processGlobal': 'browserfs/dist/shims/process.js',
-            'bufferGlobal': 'browserfs/dist/shims/bufferGlobal.js',
+            'fs': require.resolve('@zenfs/core'),
+            // 'buffer': '@zenfs/core/dist/shims/buffer.js',
+            // 'path': '@zenfs/core/dist/shims/path.js',
+            // 'processGlobal': '@zenfs/core/dist/shims/process.js',
+            // 'bufferGlobal': '@zenfs/core/dist/shims/bufferGlobal.js',
         },
         fallback: {
             'assert': require.resolve('assert'),

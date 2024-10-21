@@ -1,16 +1,7 @@
-
+import "./pollyfills/process.patch.js";
 import { } from "pyright/packages/pyright-internal/src/server";
 import { BrowserMessageReader, BrowserMessageWriter, createMessageConnection, DataCallback, Disposable, Event, MessageReader, PartialMessageInfo, SharedArraySenderStrategy, SharedArrayReceiverStrategy, MessageConnection, CompletionList, CompletionItem, NotificationType, DidChangeTextDocumentParams, CompletionParams, Position, CompletionRequest, CompletionResolveRequest, InitializeParams, DiagnosticTag, InitializeRequest, DidChangeConfigurationParams, DidOpenTextDocumentParams, PublishDiagnosticsParams, Diagnostic, LogMessageParams, ConfigurationParams, RequestType, HoverParams, HoverRequest, SignatureHelpParams, SignatureHelpRequest, SignatureHelp, Hover, DidChangeConfigurationNotification } from "vscode-languageserver/browser";
-import * as BrowserFS from "browserfs";
-// BrowserFS.configure({
-//     fs: "MountableFileSystem",
-//     options: {
-//         "/": { fs: "InMemory" },
-//     }
-// }, function (e)
-// {
 
-// })
 
 declare global
 {
