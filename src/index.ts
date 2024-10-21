@@ -1,6 +1,6 @@
 import { LspClient } from "./client";
-import _monaco, { editor, Position, languages, IRange } from "monaco-editor";
-import { CompletionItem, CompletionItemKind, CompletionList, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation } from "vscode-languageserver";
+import _monaco, { editor, Position, languages, IRange, CancellationToken } from "monaco-editor";
+import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri } from "vscode-languageserver";
 
 type MonacoModule = typeof _monaco;
 
@@ -11,6 +11,7 @@ interface MonacoPyrightProviderOptions
     signatureHelp: boolean,
     diagnostic: boolean,
     rename: boolean,
+    findDefinition: boolean,
 }
 
 const defaultOptions: MonacoPyrightProviderOptions = {
@@ -19,6 +20,7 @@ const defaultOptions: MonacoPyrightProviderOptions = {
     signatureHelp: true,
     diagnostic: true,
     rename: true,
+    findDefinition: true,
 
 };
 
@@ -61,6 +63,46 @@ export class MonacoPyrightProvider
                 signatureHelpTriggerCharacters: ['(', ','],
             });
         }
+        
+        if (finalOptions.findDefinition)
+        {
+            monacoModule.languages.registerDefinitionProvider('python', {
+                provideDefinition: this.provideDefinition.bind(this),
+            });
+        }
+
+    }
+
+    async provideDefinition(model: editor.ITextModel, position: Position, token: CancellationToken): Promise<languages.Definition | languages.LocationLink[] | null>
+    {
+        const results = await this.lspClient.getDefinition(model.getValue(), {
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+        }) as Definition;
+
+        if (!results)
+            throw new Error("Invalid result");
+
+        let location: Location;
+        if (results instanceof Array)
+        {
+            location = results[0];
+        }
+        else
+        {
+            location = results as Location;
+        }
+
+        // We only allow getting definition inside current doc.
+        if (location.uri != LspClient.docUri)
+        {
+            return null;
+        }
+
+        return {
+            uri: model.uri,
+            range: this.convertRange(location.range)
+        };
     }
 
     async onSignatureHelp(

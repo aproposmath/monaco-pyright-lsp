@@ -1,5 +1,46 @@
 import { } from "pyright/packages/pyright-internal/src/server";
-import { BrowserMessageReader, BrowserMessageWriter, createMessageConnection, DataCallback, Disposable, Event, MessageReader, PartialMessageInfo, SharedArraySenderStrategy, SharedArrayReceiverStrategy, MessageConnection, CompletionList, CompletionItem, NotificationType, DidChangeTextDocumentParams, CompletionParams, Position, CompletionRequest, CompletionResolveRequest, InitializeParams, DiagnosticTag, InitializeRequest, DidChangeConfigurationParams, DidOpenTextDocumentParams, PublishDiagnosticsParams, Diagnostic, LogMessageParams, ConfigurationParams, RequestType, HoverParams, HoverRequest, SignatureHelpParams, SignatureHelpRequest, SignatureHelp, Hover, DidChangeConfigurationNotification } from "vscode-languageserver/browser";
+import
+{
+    BrowserMessageReader,
+    DefinitionRequest,
+    BrowserMessageWriter,
+    createMessageConnection,
+    DataCallback,
+    Disposable,
+    Event,
+    MessageReader,
+    PartialMessageInfo,
+    SharedArraySenderStrategy,
+    SharedArrayReceiverStrategy,
+    MessageConnection,
+    CompletionList,
+    CompletionItem,
+    NotificationType,
+    DidChangeTextDocumentParams,
+    CompletionParams,
+    Position,
+    CompletionRequest,
+    CompletionResolveRequest,
+    InitializeParams,
+    DiagnosticTag,
+    InitializeRequest,
+    DidChangeConfigurationParams,
+    DidOpenTextDocumentParams,
+    PublishDiagnosticsParams,
+    Diagnostic,
+    LogMessageParams,
+    ConfigurationParams,
+    RequestType,
+    HoverParams,
+    HoverRequest,
+    SignatureHelpParams,
+    SignatureHelpRequest,
+    SignatureHelp,
+    Hover,
+    DidChangeConfigurationNotification,
+    DefinitionParams,
+    TextDocumentIdentifier,
+} from "vscode-languageserver/browser";
 
 
 declare global
@@ -10,7 +51,7 @@ declare global
     }
 }
 
-
+// For a single file editor, we use a constant script file url.
 const documentUri = 'file:///Untitled.py';
 
 interface DiagnosticRequest
@@ -22,11 +63,13 @@ export class LspClient
 {
     connection: MessageConnection = null as any;
     docVersion = 1;
-    lastDoc = "";
+    docText = "";
     worker: Worker;
     workerInitPromise: Promise<void>;
     private _documentDiags: PublishDiagnosticsParams | undefined;
     private _pendingDiagRequests = new Map<number, DiagnosticRequest[]>();
+
+    static docUri = documentUri;
 
     constructor(worker_url: string)
     {
@@ -42,7 +85,7 @@ export class LspClient
             }
         })
     }
-    
+
     public async initialize(projectPath: string)
     {
         await this.workerInitPromise;
@@ -81,7 +124,7 @@ export class LspClient
 
 
         this.docVersion = 1;
-        this.lastDoc = "";
+        this.docText = "";
 
         await this.connection.sendRequest(InitializeRequest.type, init);
 
@@ -101,7 +144,7 @@ export class LspClient
                     uri: documentUri,
                     languageId: 'python',
                     version: this.docVersion,
-                    text: this.lastDoc,
+                    text: this.docText,
                 },
             }
         );
@@ -155,16 +198,41 @@ export class LspClient
         );
     }
 
+    async getOrUpdateDocVersion(doc: string): Promise<number>
+    {
+        let documentVersion = this.docVersion;
+        if (this.docText !== doc)
+        {
+            documentVersion = await this.updateTextDocument(doc);
+        }
+
+        return documentVersion;
+    }
+
+    getDocIdentifier(): TextDocumentIdentifier
+    {
+        return {
+            uri: documentUri
+        };
+    }
+
+    async getDefinition(doc: string, position: Position)
+    {
+        await this.getOrUpdateDocVersion(doc);
+        
+        const params: DefinitionParams = {
+            position,
+            textDocument: this.getDocIdentifier(),
+        };
+        return await this.connection.sendRequest(DefinitionRequest.type, params);
+    }
+
     async getCompletion(
         code: string,
         position: Position
     ): Promise<CompletionList | CompletionItem[] | null>
     {
-        let documentVersion = this.docVersion;
-        if (this.lastDoc !== code)
-        {
-            documentVersion = await this.updateTextDocument(code);
-        }
+        await this.getOrUpdateDocVersion(code);
 
         const params: CompletionParams = {
             textDocument: {
@@ -182,7 +250,7 @@ export class LspClient
                 // Don't return an error. Just return null (no info).
                 return null;
             });
-        
+
         console.log("Get result", result);
 
         return result;
@@ -204,7 +272,7 @@ export class LspClient
     async getHoverInfo(code: string, position: Position): Promise<Hover | null>
     {
         let documentVersion = this.docVersion;
-        if (this.lastDoc !== code)
+        if (this.docText !== code)
         {
             documentVersion = await this.updateTextDocument(code);
         }
@@ -230,7 +298,7 @@ export class LspClient
     async getSignatureHelp(code: string, position: Position): Promise<SignatureHelp | null>
     {
         let documentVersion = this.docVersion;
-        if (this.lastDoc !== code)
+        if (this.docText !== code)
         {
             documentVersion = await this.updateTextDocument(code);
         }
@@ -249,7 +317,7 @@ export class LspClient
                 // Don't return an error. Just return null (no info).
                 return null;
             });
-        
+
         console.log("signature help", result);
 
         return result;
@@ -257,7 +325,7 @@ export class LspClient
 
     async getDiagnostics(code: string): Promise<Diagnostic[]>
     {
-        const codeChanged = this.lastDoc !== code;
+        const codeChanged = this.docText !== code;
 
         // If the code hasn't changed since the last time we received
         // a code update, return the cached diagnostics.
@@ -315,7 +383,7 @@ export class LspClient
                         pythonVersion: "3.13",
                         pythonPlatform: "All",
                     }
-                    }
+                }
             });
     }
 
