@@ -1,10 +1,11 @@
 import { LspClient } from "./client";
 import _monaco, { editor, Position, languages, IRange, CancellationToken, IMarkdownString } from "monaco-editor";
 import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri, TextDocumentEdit, AnnotatedTextEdit } from "vscode-languageserver";
+import { UserFolder } from "./message";
 
 type MonacoModule = typeof _monaco;
 
-interface MonacoPyrightProviderOptions
+interface MonacoPyrightProviderFeatures
 {
     hover: boolean,
     completion: boolean,
@@ -14,14 +15,24 @@ interface MonacoPyrightProviderOptions
     findDefinition: boolean,
 }
 
-const defaultOptions: MonacoPyrightProviderOptions = {
-    hover: true,
-    completion: true,
-    signatureHelp: true,
-    diagnostic: true,
-    rename: true,
-    findDefinition: true,
+interface MonacoPyrightOptions
+{
+    features: Partial<MonacoPyrightProviderFeatures>,
+    builtInTypeshed: boolean,
+    typeStubs?: string | UserFolder,
+}
 
+const defaultOptions: MonacoPyrightOptions = {
+    features: {
+        hover: true,
+        completion: true,
+        signatureHelp: true,
+        diagnostic: true,
+        rename: true,
+        findDefinition: true,
+    },
+    builtInTypeshed: true,
+    typeStubs: undefined,
 };
 
 export class MonacoPyrightProvider
@@ -34,20 +45,31 @@ export class MonacoPyrightProvider
         this.lspClient = new LspClient(workerUrl);
     }
 
-    async init(monacoModule: MonacoModule, options?: Partial<MonacoPyrightProviderOptions>)
+    async init(monacoModule: MonacoModule, options?: Partial<MonacoPyrightOptions>)
     {
-        await this.lspClient.initialize("/");
+        const finalOptions = Object.assign(defaultOptions, options || {});
+
+        let typeStubsFolder: UserFolder = {};
+        if (typeof (options?.typeStubs) === "string")
+        {
+            typeStubsFolder["user_types.pyi"] = options.typeStubs;
+        }
+        else if (typeof (options?.typeStubs) === "object")
+        {
+            typeStubsFolder = options.typeStubs;
+        }
+
+        await this.lspClient.initialize("/", typeStubsFolder);
         await this.lspClient.updateSettings();
 
-        const finalOptions = Object.assign(defaultOptions, options || {});
-        if (finalOptions.hover)
+        if (finalOptions.features.hover)
         {
             monacoModule.languages.registerHoverProvider('python', {
                 provideHover: this.onHover.bind(this),
             });
         }
 
-        if (finalOptions.completion)
+        if (finalOptions.features.completion)
         {
             monacoModule.languages.registerCompletionItemProvider('python', {
                 provideCompletionItems: this.onCompletionRequest.bind(this),
@@ -56,7 +78,7 @@ export class MonacoPyrightProvider
             });
         }
 
-        if (finalOptions.signatureHelp)
+        if (finalOptions.features.signatureHelp)
         {
             monacoModule.languages.registerSignatureHelpProvider('python', {
                 provideSignatureHelp: this.onSignatureHelp.bind(this),
@@ -64,17 +86,20 @@ export class MonacoPyrightProvider
             });
         }
         
-        if (finalOptions.findDefinition)
+        if (finalOptions.features.findDefinition)
         {
             monacoModule.languages.registerDefinitionProvider('python', {
                 provideDefinition: this.provideDefinition.bind(this),
             });
         }
 
-        monacoModule.languages.registerRenameProvider('python', {
-            provideRenameEdits: this.provideRenameEdits.bind(this),
-            resolveRenameLocation: this.resolveRename.bind(this)
-        });
+        if (finalOptions.features.rename)
+        {
+            monacoModule.languages.registerRenameProvider('python', {
+                provideRenameEdits: this.provideRenameEdits.bind(this),
+                resolveRenameLocation: this.resolveRename.bind(this)
+            });   
+        }
 
     }
 

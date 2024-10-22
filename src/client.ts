@@ -49,6 +49,7 @@ import
     DidCreateFilesNotification,
     WillCreateFilesRequest,
 } from "vscode-languageserver/browser";
+import { InitializeMsg, MsgInitServer, MsgOfType, MsgServerLoaded, UserFolder } from "./message";
 
 
 declare global
@@ -73,7 +74,8 @@ export class LspClient
     docVersion = 1;
     docText = "";
     worker: Worker;
-    workerInitPromise: Promise<void>;
+    workerLoadedPromise: Promise<MsgServerLoaded>;
+
     private _documentDiags: PublishDiagnosticsParams | undefined;
     private _pendingDiagRequests = new Map<number, DiagnosticRequest[]>();
 
@@ -82,21 +84,21 @@ export class LspClient
     constructor(worker_url: string)
     {
         this.worker = new Worker(worker_url);
-        this.workerInitPromise = new Promise((resolve) =>
-        {
-            this.worker.onmessage = (msg) =>
-            {
-                if (msg.data === "INITIALIZED")
-                {
-                    resolve();
-                }
-            }
-        })
+
+        this.workerLoadedPromise = this.waitServerInitializeMsg("serverLoaded");
     }
 
-    public async initialize(projectPath: string)
+    public async initialize(projectPath: string, userFiles: UserFolder = {})
     {
-        await this.workerInitPromise;
+        await this.workerLoadedPromise;
+
+        this.worker.postMessage(<MsgInitServer>{
+            type: "initServer",
+            userFiles: userFiles,
+        });
+
+        await this.waitServerInitializeMsg("serverInitialized");
+
 
         const reader = new BrowserMessageReader(this.worker);
         const writer = new BrowserMessageWriter(this.worker);
@@ -204,6 +206,28 @@ export class LspClient
                 return [];
             }
         );
+    }
+
+    private waitServerInitializeMsg<T extends InitializeMsg["type"]>(msgType: T) : Promise<MsgOfType<T>>
+    {
+        return new Promise((resolve, reject) =>
+        {
+            this.worker.onmessage = (msgEv) =>
+            {
+                const msg = msgEv.data as InitializeMsg;
+                if (msg.type === msgType)
+                {
+                    resolve(msg as MsgOfType<T>);
+                }
+                else
+                {
+                    reject({
+                        reason: "Message mismatch",
+                        msg: msg
+                    });
+                }
+            }
+        });
     }
 
     async getOrUpdateDocVersion(doc: string): Promise<number>
