@@ -1,6 +1,6 @@
 import { LspClient } from "./client";
 import _monaco, { editor, Position, languages, IRange, CancellationToken, IMarkdownString } from "monaco-editor";
-import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri } from "vscode-languageserver";
+import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri, TextDocumentEdit, AnnotatedTextEdit } from "vscode-languageserver";
 
 type MonacoModule = typeof _monaco;
 
@@ -71,7 +71,84 @@ export class MonacoPyrightProvider
             });
         }
 
+        monacoModule.languages.registerRenameProvider('python', {
+            provideRenameEdits: this.provideRenameEdits.bind(this),
+            resolveRenameLocation: this.resolveRename.bind(this)
+        });
+
     }
+
+    async provideRenameEdits(model: editor.ITextModel, position: Position, newName: string, token: CancellationToken): Promise<languages.WorkspaceEdit & languages.Rejection | null>
+    {
+        const results = await this.lspClient.rename(model.getValue(), this.convertLspPosition(position), newName);
+
+        console.log("rename", results)
+
+        if (!results)
+            return null;
+
+        if (results.documentChanges)
+        {
+            return {
+                edits: results.documentChanges.filter(docChange => (docChange as TextDocumentEdit).textDocument?.uri === LspClient.docUri)
+                    .map(edit => edit as TextDocumentEdit)
+                    .flatMap(edit => edit.edits)
+                    .map(edit => ({
+                        resource: model.uri,
+                        textEdit: {
+                            range: this.convertRange(edit.range),
+                            text: edit.newText,
+                        },
+                        versionId: undefined,
+                    }))
+            };
+        }
+
+        return null;
+    }
+
+    async resolveRename(model: editor.ITextModel, position: Position, token: CancellationToken): Promise<languages.RenameLocation | null>
+    {
+        // Just use default behaviour
+        return null;
+
+        type DefaultBehavior = {
+            defaultBehavior: boolean;
+        };
+        type RangeWithPlaceHolder = {
+            range: Range;
+            placeholder: string;
+        };
+        const results = await this.lspClient.parepareRename(model.getValue(), this.convertLspPosition(position));
+        console.log("rename request", results);
+
+        if (!results)
+            return null;
+
+        if ((results as DefaultBehavior).defaultBehavior)
+        {
+            return null;
+        }
+
+        if ((results as RangeWithPlaceHolder).range)
+        {
+            return {
+                range: this.convertRange((results as RangeWithPlaceHolder).range),
+                text: (results as RangeWithPlaceHolder).placeholder,
+            }
+        }
+
+        if ((results as Range).start)
+        {
+            return {
+                range: this.convertRange(results as Range),
+                text: ""
+            }
+        }
+
+        return null;
+    }
+
 
     async provideDefinition(model: editor.ITextModel, position: Position, token: CancellationToken): Promise<languages.Definition | languages.LocationLink[] | null>
     {
@@ -196,6 +273,14 @@ export class MonacoPyrightProvider
 
         const result = await this.lspClient.resolveCompletion(original);
         return this.convertCompletionItem(result as CompletionItem);
+    }
+
+    convertLspPosition(position: Position)
+    {
+        return {
+            line: position.lineNumber - 1,
+            character: position.column - 1,
+        };
     }
 
     convertCompletionItem(

@@ -40,6 +40,14 @@ import
     DidChangeConfigurationNotification,
     DefinitionParams,
     TextDocumentIdentifier,
+    RenameRequest,
+    RenameParams,
+    PrepareRenameRequest,
+    PrepareRenameParams,
+    PrepareRenameResult,
+    WorkspaceEdit,
+    DidCreateFilesNotification,
+    WillCreateFilesRequest,
 } from "vscode-languageserver/browser";
 
 
@@ -52,7 +60,7 @@ declare global
 }
 
 // For a single file editor, we use a constant script file url.
-const documentUri = 'file:///Untitled.py';
+const documentUri = 'file:///untitled';
 
 interface DiagnosticRequest
 {
@@ -214,6 +222,32 @@ export class LspClient
         return {
             uri: documentUri
         };
+    }
+
+    async rename(doc: string, position: Position, newName: string): Promise<WorkspaceEdit | null>
+    {
+        this.getOrUpdateDocVersion(doc);
+
+        const params: RenameParams = {
+            textDocument: this.getDocIdentifier(),
+            newName,
+            position,
+        };
+
+        const result = await this.connection.sendRequest(RenameRequest.type, params);
+        return result;
+    }
+
+    async parepareRename(doc: string, position: Position): Promise<PrepareRenameResult | null>
+    {
+        this.getOrUpdateDocVersion(doc);
+
+        const params: PrepareRenameParams = {
+            textDocument: this.getDocIdentifier(),
+            position,
+        };
+
+        return await this.connection.sendRequest(PrepareRenameRequest.type, params);
     }
 
     async getDefinition(doc: string, position: Position)
