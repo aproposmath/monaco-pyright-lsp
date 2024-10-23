@@ -2,6 +2,7 @@ import * as monaco from "monaco-editor";
 import {  } from "monaco-editor";
 import "./style.css";
 import { MonacoPyrightProvider } from "../src";
+import largeUserModStubPack from "./typings/packed_user_mod.zip";
 
 const userTypeStub =
 `
@@ -27,7 +28,8 @@ async function init()
         typeStubs: {
             "user_mod": {
                 "__init__.pyi": userTypeStub
-            }
+            },
+            "packed_user_mod": largeUserModStubPack,
         }
     });
 

@@ -1,5 +1,6 @@
 import "./polyfills/process.patch";
 import "./polyfills/fs.patch";
+import "./polyfills/timeout.patch.js";
 
 import { createFromRealFileSystem, RealTempFile } from "pyright/packages/pyright-internal/src/common/realFileSystem";
 import { PyrightFileSystem } from "pyright/packages/pyright-internal/src/pyrightFileSystem";
@@ -16,7 +17,7 @@ import { Buffer } from "buffer"
 import { Uri } from "pyright/packages/pyright-internal/src/common/uri/uri";
 import { FileUri } from "pyright/packages/pyright-internal/src/common/uri/fileUri";
 import { BaseUri } from "pyright/packages/pyright-internal/src/common/uri/baseUri";
-import { _Zip as Zip } from "@zenfs/zip";
+import { _Zip as Zip, ZipFS } from "@zenfs/zip";
 import path from "path";
 import { InitializeMsg, MsgInitServer, MsgServerInitialized, MsgServerLoaded, UserFolder } from "./message";
 
@@ -48,7 +49,8 @@ function createUserFiles(parentPath: string, folder: UserFolder)
         }
         else if (folder[name] instanceof ArrayBuffer)
         {
-            zenfs.writeFileSync(path.join(parentPath, name), new DataView(folder[name]));
+            zenfs.mkdirSync(path.join(parentPath, name));
+            zenfs.mount(path.join(parentPath, name), new ZipFS(name, folder[name] as ArrayBuffer) as any);
         }
         else
         {

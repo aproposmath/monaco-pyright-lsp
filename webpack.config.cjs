@@ -63,7 +63,7 @@ const config = {
                 type: 'asset',
             },
             {
-                test: /\.(zip)$/i,
+                test: /\.(zip|egg)$/i,
                 use: ['arraybuffer-loader'],
             }
             // Add your rules for custom modules here
