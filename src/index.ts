@@ -1,6 +1,6 @@
 import { LspClient } from "./client";
-import _monaco, { editor, Position, languages, IRange, CancellationToken, IMarkdownString } from "monaco-editor";
-import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri, TextDocumentEdit, AnnotatedTextEdit } from "vscode-languageserver";
+import _monaco, { editor, Position, languages, IRange, CancellationToken, IMarkdownString, IDisposable, MarkerSeverity } from "monaco-editor";
+import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri, TextDocumentEdit, AnnotatedTextEdit, DiagnosticSeverity } from "vscode-languageserver";
 import { UserFolder } from "./message";
 
 type MonacoModule = typeof _monaco;
@@ -20,6 +20,9 @@ interface MonacoPyrightOptions
     features: Partial<MonacoPyrightProviderFeatures>,
     builtInTypeshed: boolean,
     typeStubs?: string | UserFolder,
+
+    /** Minimal time in milliseconds to wait before sending next update notification */
+    diagnosticsInterval: number,
 }
 
 const defaultOptions: MonacoPyrightOptions = {
@@ -33,22 +36,30 @@ const defaultOptions: MonacoPyrightOptions = {
     },
     builtInTypeshed: true,
     typeStubs: undefined,
+    diagnosticsInterval: 1000,
 };
 
 export class MonacoPyrightProvider
 {
     lspClient: LspClient;
+    options: MonacoPyrightOptions;
+    editorChangeListener?: IDisposable;
+    monacoMod?: MonacoModule;
 
-
-    public constructor(workerUrl: string)
+    public constructor(workerUrl: string, options?: Partial<MonacoPyrightOptions>)
     { 
         this.lspClient = new LspClient(workerUrl);
-    }
 
-    async init(monacoModule: MonacoModule, options?: Partial<MonacoPyrightOptions>)
-    {
         const finalOptions = Object.assign(defaultOptions, options || {});
 
+        this.options = finalOptions;
+    }
+
+    async init(monacoModule: MonacoModule, )
+    {
+        this.monacoMod = monacoModule;
+
+        const options = this.options;
         let typeStubsFolder: UserFolder = {};
         if (typeof (options?.typeStubs) === "string")
         {
@@ -62,14 +73,14 @@ export class MonacoPyrightProvider
         await this.lspClient.initialize("/", typeStubsFolder);
         await this.lspClient.updateSettings();
 
-        if (finalOptions.features.hover)
+        if (options.features.hover)
         {
             monacoModule.languages.registerHoverProvider('python', {
                 provideHover: this.onHover.bind(this),
             });
         }
 
-        if (finalOptions.features.completion)
+        if (options.features.completion)
         {
             monacoModule.languages.registerCompletionItemProvider('python', {
                 provideCompletionItems: this.onCompletionRequest.bind(this),
@@ -78,7 +89,7 @@ export class MonacoPyrightProvider
             });
         }
 
-        if (finalOptions.features.signatureHelp)
+        if (options.features.signatureHelp)
         {
             monacoModule.languages.registerSignatureHelpProvider('python', {
                 provideSignatureHelp: this.onSignatureHelp.bind(this),
@@ -86,14 +97,14 @@ export class MonacoPyrightProvider
             });
         }
         
-        if (finalOptions.features.findDefinition)
+        if (options.features.findDefinition)
         {
             monacoModule.languages.registerDefinitionProvider('python', {
                 provideDefinition: this.provideDefinition.bind(this),
             });
         }
 
-        if (finalOptions.features.rename)
+        if (options.features.rename)
         {
             monacoModule.languages.registerRenameProvider('python', {
                 provideRenameEdits: this.provideRenameEdits.bind(this),
@@ -101,6 +112,82 @@ export class MonacoPyrightProvider
             });   
         }
 
+    }
+
+    private timer = -1
+    async setupDiagnostics(editor: editor.IStandaloneCodeEditor)
+    {
+        if (this.options.features.diagnostic)
+        {
+            if (this.editorChangeListener)
+            {
+                return;
+            }
+
+            this.lspClient.setupDiagnosticsCallback((diagnostics) =>
+            {
+                const markers = diagnostics.map(diag => (<editor.IMarkerData>{
+                    ...this.convertRange(diag.range),
+                    severity: this.convertSeverity(diag.severity || DiagnosticSeverity.Hint),
+                    message: diag.message
+                }));
+
+
+                this.monacoMod?.editor?.setModelMarkers(editor.getModel() as editor.ITextModel, 'Pyright', markers);
+            });
+
+            this.editorChangeListener = editor.onDidChangeModelContent((e) =>
+            {
+                // here is a pending update
+                if (this.timer > 0)
+                {
+                    return;
+                }
+
+                // Update immediately and start a new timer to throttle next update
+                this.updateDoc(editor);
+                this.timer = window.setTimeout(() =>
+                {
+                    this.timer = -1;
+                    this.updateDoc(editor);
+                }, this.options.diagnosticsInterval);
+                
+            });   
+        }
+    }
+
+    async stopDiagnostics()
+    {
+        this.editorChangeListener?.dispose();
+    }
+
+    convertSeverity(severity: DiagnosticSeverity): MarkerSeverity
+    {
+        switch (severity)
+        {
+            case DiagnosticSeverity.Error:
+            default:
+                return MarkerSeverity.Error;
+
+            case DiagnosticSeverity.Warning:
+                return MarkerSeverity.Warning;
+
+            case DiagnosticSeverity.Information:
+                return MarkerSeverity.Info;
+
+            case DiagnosticSeverity.Hint:
+                return MarkerSeverity.Hint;
+        }
+    }
+
+    private updateDoc(editor: editor.IStandaloneCodeEditor)
+    {
+        if (editor.getModel()?.getLanguageId() != 'python')
+        {
+            return;
+        }
+        const doc = editor.getValue();
+        this.lspClient.updateDocVersion(doc);
     }
 
     async provideRenameEdits(model: editor.ITextModel, position: Position, newName: string, token: CancellationToken): Promise<languages.WorkspaceEdit & languages.Rejection | null>

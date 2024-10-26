@@ -48,6 +48,7 @@ import
     WorkspaceEdit,
     DidCreateFilesNotification,
     WillCreateFilesRequest,
+    PublishDiagnosticsNotification,
 } from "vscode-languageserver/browser";
 import { InitializeMsg, MsgInitServer, MsgOfType, MsgServerLoaded, UserFolder } from "./message";
 
@@ -77,7 +78,6 @@ export class LspClient
     workerLoadedPromise: Promise<MsgServerLoaded>;
 
     private _documentDiags: PublishDiagnosticsParams | undefined;
-    private _pendingDiagRequests = new Map<number, DiagnosticRequest[]>();
 
     static docUri = documentUri;
 
@@ -159,34 +159,6 @@ export class LspClient
             }
         );
 
-        // Receive diagnostics from the language server.
-        this.connection.onNotification(
-            new NotificationType<PublishDiagnosticsParams>('textDocument/publishDiagnostics'),
-            (diagInfo) =>
-            {
-                const diagVersion = diagInfo.version ?? -1;
-
-                console.info(`Received diagnostics for version: ${diagVersion}`);
-
-                // Update the cached diagnostics.
-                if (
-                    this._documentDiags === undefined ||
-                    this._documentDiags.version! < diagVersion
-                )
-                {
-                    this._documentDiags = diagInfo;
-                }
-
-                // Resolve any pending diagnostic requests.
-                const pendingRequests = this._pendingDiagRequests.get(diagVersion) ?? [];
-                this._pendingDiagRequests.delete(diagVersion);
-
-                for (const request of pendingRequests)
-                {
-                    request.callback(diagInfo.diagnostics);
-                }
-            }
-        );
 
         // Log messages received by the language server for debugging purposes.
         this.connection.onNotification(
@@ -230,7 +202,32 @@ export class LspClient
         });
     }
 
-    async getOrUpdateDocVersion(doc: string): Promise<number>
+    async setupDiagnosticsCallback(callback: (diagnostics: Diagnostic[]) => void)
+    {
+        // Receive diagnostics from the language server.
+        this.connection.onNotification(
+            new NotificationType<PublishDiagnosticsParams>('textDocument/publishDiagnostics'),
+            (diagInfo) =>
+            {
+                const diagVersion = diagInfo.version ?? -1;
+
+                console.info(`Received diagnostics for version: ${diagVersion}`);
+
+                // Update the cached diagnostics.
+                if (
+                    this._documentDiags === undefined ||
+                    this._documentDiags.version! < diagVersion
+                )
+                {
+                    this._documentDiags = diagInfo;
+                }
+
+                callback(diagInfo.diagnostics);
+            }
+        );
+    }
+
+    async updateDocVersion(doc: string): Promise<number>
     {
         let documentVersion = this.docVersion;
         if (this.docText !== doc)
@@ -250,7 +247,7 @@ export class LspClient
 
     async rename(doc: string, position: Position, newName: string): Promise<WorkspaceEdit | null>
     {
-        this.getOrUpdateDocVersion(doc);
+        this.updateDocVersion(doc);
 
         const params: RenameParams = {
             textDocument: this.getDocIdentifier(),
@@ -264,7 +261,7 @@ export class LspClient
 
     async parepareRename(doc: string, position: Position): Promise<PrepareRenameResult | null>
     {
-        this.getOrUpdateDocVersion(doc);
+        this.updateDocVersion(doc);
 
         const params: PrepareRenameParams = {
             textDocument: this.getDocIdentifier(),
@@ -276,7 +273,7 @@ export class LspClient
 
     async getDefinition(doc: string, position: Position)
     {
-        await this.getOrUpdateDocVersion(doc);
+        await this.updateDocVersion(doc);
         
         const params: DefinitionParams = {
             position,
@@ -290,7 +287,7 @@ export class LspClient
         position: Position
     ): Promise<CompletionList | CompletionItem[] | null>
     {
-        await this.getOrUpdateDocVersion(code);
+        await this.updateDocVersion(code);
 
         const params: CompletionParams = {
             textDocument: {
@@ -379,52 +376,6 @@ export class LspClient
         console.log("signature help", result);
 
         return result;
-    }
-
-    async getDiagnostics(code: string): Promise<Diagnostic[]>
-    {
-        const codeChanged = this.docText !== code;
-
-        // If the code hasn't changed since the last time we received
-        // a code update, return the cached diagnostics.
-        if (!codeChanged && this._documentDiags)
-        {
-            return this._documentDiags.diagnostics;
-        }
-
-        // The diagnostics will come back asynchronously, so
-        // return a promise.
-        return new Promise<Diagnostic[]>(async (resolve, reject) =>
-        {
-            let documentVersion = this.docVersion;
-
-            if (codeChanged)
-            {
-                documentVersion = await this.updateTextDocument(code);
-            }
-
-            // Queue a request for diagnostics.
-            let requestList = this._pendingDiagRequests.get(documentVersion);
-            if (!requestList)
-            {
-                requestList = [];
-                this._pendingDiagRequests.set(documentVersion, requestList);
-            }
-
-            requestList.push({
-                callback: (diagnostics, err) =>
-                {
-                    if (err)
-                    {
-                        reject(err);
-                        return;
-                    }
-
-                    console.info(`Diagnostic callback ${JSON.stringify(diagnostics)}}`);
-                    resolve(diagnostics);
-                },
-            });
-        });
     }
 
     async updateSettings(): Promise<void>

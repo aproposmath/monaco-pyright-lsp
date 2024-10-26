@@ -23,19 +23,26 @@ x = add(1, 2)
 
 async function init()
 {
-    const pyrightProvider = new MonacoPyrightProvider("worker.js");
-    await pyrightProvider.init(monaco, {
+    const pyrightProvider = new MonacoPyrightProvider("worker.js", {
         typeStubs: {
             "user_mod": {
                 "__init__.pyi": userTypeStub
             },
             "packed_user_mod": largeUserModStubPack,
-        }
+        },
     });
 
-    monaco.editor.create(document.querySelector("#editor") as HTMLElement, {
+    await pyrightProvider.init(monaco,);
+    
+
+    const editorInstance = monaco.editor.create(document.querySelector("#editor") as HTMLElement, {
         value: exampleCode,
         language: "python",
     });
+
+
+    await pyrightProvider.setupDiagnostics(editorInstance);
+
+    pyrightProvider.setupDiagnostics
 }
 init();

@@ -78,7 +78,7 @@ async function handleInitServer(msg: MsgInitServer)
         },
     });
 
-    let server = new PyrightServer(connection, 0);
+    let server = new PyrightServer(connection as any, 0);
 
     return server;
 }
