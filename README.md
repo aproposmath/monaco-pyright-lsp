@@ -9,6 +9,15 @@ Make a [Pyright](https://github.com/microsoft/pyright) python language server ru
 
 Try it on browser: <https://sardinefish.github.io/monaco-pyright-lsp/>
 
+## Features
+
+- Auto-completion
+- Function signature help
+- Symbol rename
+- Finding definition
+- Built-in type stubs
+- Syntax diagnostics
+
 ## How it works
 
 We bundle a pyright language server into a Web Worker using webpack with a lot of polyfills to make it running on browser. 
