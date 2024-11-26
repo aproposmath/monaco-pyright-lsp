@@ -1,7 +1,7 @@
 {
   "name": "monaco-pyright-lsp",
-  "version": "1.0.0",
-  "description": "My webpack project",
+  "version": "0.1.1",
+  "description": "Make a Pyright language server running on browser and provide language features to Monaco Editor",
   "main": "./dist/index.js",
   "scripts": {
     "build": "webpack --mode=development && npx tsc",
@@ -13,6 +13,10 @@
   },
   "author": "SardineFish",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/SardineFish/monaco-pyright-lsp.git"
+  },
   "devDependencies": {
     "@webpack-cli/generators": "^3.0.7",
     "arraybuffer-loader": "^1.0.8",

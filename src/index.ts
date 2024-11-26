@@ -196,8 +196,6 @@ export class MonacoPyrightProvider
     {
         const results = await this.lspClient.rename(model.getValue(), this.convertLspPosition(position), newName);
 
-        console.log("rename", results)
-
         if (!results)
             return null;
 
@@ -234,7 +232,7 @@ export class MonacoPyrightProvider
             placeholder: string;
         };
         const results = await this.lspClient.parepareRename(model.getValue(), this.convertLspPosition(position));
-        console.log("rename request", results);
+        // console.log("rename request", results);
 
         if (!results)
             return null;
@@ -361,7 +359,7 @@ export class MonacoPyrightProvider
             character: position.column - 1,
         }) as CompletionList;
 
-        console.log(completionInfo);
+        // console.log(completionInfo);
 
         return {
             suggestions: completionInfo.items.map((item) =>

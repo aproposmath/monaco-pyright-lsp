@@ -182,7 +182,7 @@ export class LspClient
             new RequestType<ConfigurationParams, any, any>('workspace/configuration'),
             (params) =>
             {
-                console.info(`Language server config request: ${JSON.stringify(params)}}`);
+                // console.info(`Language server config request: ${JSON.stringify(params)}}`);
                 return [];
             }
         );
@@ -219,7 +219,7 @@ export class LspClient
             {
                 const diagVersion = diagInfo.version ?? -1;
 
-                console.info(`Received diagnostics for version: ${diagVersion}`);
+                // console.info(`Received diagnostics for version: ${diagVersion}`);
 
                 // Update the cached diagnostics.
                 if (
@@ -304,8 +304,6 @@ export class LspClient
             position,
         };
 
-        console.log("Request completion");
-
         const result = await this.connection
             .sendRequest(CompletionRequest.type, params)
             .catch((err) =>
@@ -313,8 +311,6 @@ export class LspClient
                 // Don't return an error. Just return null (no info).
                 return null;
             });
-
-        console.log("Get result", result);
 
         return result;
     }
@@ -381,8 +377,6 @@ export class LspClient
                 return null;
             });
 
-        console.log("signature help", result);
-
         return result;
     }
 
@@ -409,7 +403,7 @@ export class LspClient
     private async updateTextDocument(code: string): Promise<number>
     {
         ++this.docVersion;
-        console.info(`Updating text document to version ${this.docVersion}`);
+        // console.info(`Updating text document to version ${this.docVersion}`);
 
         // Send the updated text to the language server.
         return this.connection
@@ -429,7 +423,7 @@ export class LspClient
             )
             .then(() =>
             {
-                console.info(`Successfully sent text document to language server`);
+                // console.info(`Successfully sent text document to language server`);
                 return this.docVersion;
             })
             .catch((err) =>
