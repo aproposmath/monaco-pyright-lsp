@@ -1,5 +1,5 @@
-import "./polyfills/process.patch";
-import "./polyfills/fs.patch";
+import "./polyfills/process.patch.ts";
+import "./polyfills/fs.patch.ts";
 import "./polyfills/timeout.patch.js";
 
 import { createFromRealFileSystem, RealTempFile } from "pyright/packages/pyright-internal/src/common/realFileSystem";
@@ -12,14 +12,14 @@ import { Connection as BrowserConnection } from "vscode-languageserver/browser";
 // import * as BrowserFS from "browserfs";
 import * as ZenFS from "@zenfs/core";
 import * as fs from "fs";
-import typeshedZip from "../assets/typeshed-fallback.zip";
+import typeshedZip from "../../assets/typeshed-fallback.zip";
 import { Buffer } from "buffer"
 import { Uri } from "pyright/packages/pyright-internal/src/common/uri/uri";
 import { FileUri } from "pyright/packages/pyright-internal/src/common/uri/fileUri";
 import { BaseUri } from "pyright/packages/pyright-internal/src/common/uri/baseUri";
 import { _Zip as Zip, ZipFS } from "@zenfs/zip";
 import path from "path";
-import { InitializeMsg, MsgInitServer, MsgServerInitialized, MsgServerLoaded, UserFolder } from "./message";
+import { InitializeMsg, MsgInitServer, MsgServerInitialized, MsgServerLoaded, UserFolder } from "../message.js";
 
 async function initFs()
 {

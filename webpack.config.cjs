@@ -16,9 +16,9 @@ const stylesHandler = 'style-loader';
 
 const config = {
     entry: {
-        lib: './src/index.ts',
-        example: "./example/example.ts",
-        worker: "./src/worker.ts"
+        // index: './src/index.ts',
+        // example: "./example/example.ts",
+        worker: "./src/pyright-worker/worker.ts"
     },
     output: {
         path: path.resolve(__dirname, 'dist'),
@@ -28,12 +28,12 @@ const config = {
         host: 'localhost',
     },
     plugins: [
-        new HtmlWebpackPlugin({
-            template: 'example/index.html',
-            chunks: [
-                "example"
-            ]
-        }),
+        // new HtmlWebpackPlugin({
+        //     template: 'example/index.html',
+        //     chunks: [
+        //         "example"
+        //     ]
+        // }),
         new Dotenv(),
         new webpack.ProvidePlugin({ process: 'process/browser', Buffer: ['buffer', 'Buffer'] }),
         new webpack.DefinePlugin({
@@ -69,6 +69,9 @@ const config = {
             // Add your rules for custom modules here
             // Learn more about loaders from https://webpack.js.org/loaders/
         ],
+        parser: {
+            javascript: { importMeta: false }
+        }
     },
     resolve: {
         extensions: ['.tsx', '.ts', '.jsx', '.js', '...'],

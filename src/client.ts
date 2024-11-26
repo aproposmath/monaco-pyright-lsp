@@ -1,4 +1,4 @@
-import { } from "pyright/packages/pyright-internal/src/server";
+// import type { } from "pyright/packages/pyright-internal/src/server";
 import
 {
     BrowserMessageReader,
@@ -51,6 +51,7 @@ import
     PublishDiagnosticsNotification,
 } from "vscode-languageserver/browser";
 import { InitializeMsg, MsgInitServer, MsgOfType, MsgServerLoaded, UserFolder } from "./message";
+// import Worker from "./worker.ts";
 
 
 declare global
@@ -81,9 +82,16 @@ export class LspClient
 
     static docUri = documentUri;
 
-    constructor(worker_url: string)
+    constructor(worker_url?: string)
     {
-        this.worker = new Worker(worker_url);
+        if (worker_url)
+        {
+            this.worker = new Worker(worker_url);   
+        }
+        else
+        {
+            this.worker = new Worker(new URL("./worker.js", import.meta.url));
+        }
 
         this.workerLoadedPromise = this.waitServerInitializeMsg("serverLoaded");
     }

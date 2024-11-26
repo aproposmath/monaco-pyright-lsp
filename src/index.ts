@@ -1,6 +1,8 @@
 import { LspClient } from "./client";
-import _monaco, { editor, Position, languages, IRange, CancellationToken, IMarkdownString, IDisposable, MarkerSeverity } from "monaco-editor";
-import { CompletionItem, CompletionItemKind, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri, TextDocumentEdit, AnnotatedTextEdit, DiagnosticSeverity } from "vscode-languageserver";
+import type { editor, Position, IRange, CancellationToken, languages, IMarkdownString, IDisposable } from "monaco-editor";
+import type _monaco from "monaco-editor";
+// import { MarkerSeverity, languages } from "monaco-editor";
+import { CompletionItem, CompletionList, Definition, Hover, InsertReplaceEdit, MarkupContent, ParameterInformation, Range, SignatureHelp, SignatureInformation, Location, DocumentUri, TextDocumentEdit, AnnotatedTextEdit, DiagnosticSeverity } from "vscode-languageserver";
 import { UserFolder } from "./message";
 
 type MonacoModule = typeof _monaco;
@@ -46,7 +48,7 @@ export class MonacoPyrightProvider
     editorChangeListener?: IDisposable;
     monacoMod?: MonacoModule;
 
-    public constructor(workerUrl: string, options?: Partial<MonacoPyrightOptions>)
+    public constructor(workerUrl?: string, options?: Partial<MonacoPyrightOptions>)
     { 
         this.lspClient = new LspClient(workerUrl);
 
@@ -468,25 +470,65 @@ export class MonacoPyrightProvider
         switch (itemKind)
         {
             case CompletionItemKind.Constant:
-                return languages.CompletionItemKind.Constant;
+                return CompletionItemKind.Constant;
 
             case CompletionItemKind.Variable:
-                return languages.CompletionItemKind.Variable;
+                return CompletionItemKind.Variable;
 
             case CompletionItemKind.Function:
-                return languages.CompletionItemKind.Function;
+                return CompletionItemKind.Function;
 
             case CompletionItemKind.Field:
-                return languages.CompletionItemKind.Field;
+                return CompletionItemKind.Field;
 
             case CompletionItemKind.Keyword:
-                return languages.CompletionItemKind.Keyword;
+                return CompletionItemKind.Keyword;
 
             default:
-                return languages.CompletionItemKind.Reference;
+                return CompletionItemKind.Reference;
         }
     }
 
+}
+
+export enum MarkerSeverity
+{
+    Hint = 1,
+    Info = 2,
+    Warning = 4,
+    Error = 8
+}
+
+enum CompletionItemKind
+{
+    Method = 0,
+    Function = 1,
+    Constructor = 2,
+    Field = 3,
+    Variable = 4,
+    Class = 5,
+    Struct = 6,
+    Interface = 7,
+    Module = 8,
+    Property = 9,
+    Event = 10,
+    Operator = 11,
+    Unit = 12,
+    Value = 13,
+    Constant = 14,
+    Enum = 15,
+    EnumMember = 16,
+    Keyword = 17,
+    Text = 18,
+    Color = 19,
+    File = 20,
+    Reference = 21,
+    Customcolor = 22,
+    Folder = 23,
+    TypeParameter = 24,
+    User = 25,
+    Issue = 26,
+    Snippet = 27
 }
 
 interface ExtendedCompletionItem extends CompletionItem
