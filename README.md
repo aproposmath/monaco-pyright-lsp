@@ -1,17 +1,22 @@
-# Pyright Language Server for Monaco Editor on Browser
+# Python Language Server for Monaco Editor on Browser
 
-Make a [Pyright](https://github.com/microsoft/pyright) language server running on browser and provide language features to [Monaco Editor](https://github.com/microsoft/monaco-editor). 
+![GitHub License](https://img.shields.io/github/license/SardineFish/monaco-pyright-lsp)
+[![Publish to npm](https://github.com/SardineFish/monaco-pyright-lsp/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/SardineFish/monaco-pyright-lsp/actions/workflows/npm-publish.yml)
+![NPM Version](https://img.shields.io/npm/v/monaco-pyright-lsp)
+
+
+Make a [Pyright](https://github.com/microsoft/pyright) python language server running on browser and provide language features to [Monaco Editor](https://github.com/microsoft/monaco-editor). 
 
 Try it on browser: <https://sardinefish.github.io/monaco-pyright-lsp/>
 
 ## How it works
 
-We Bundle a pyright into a Web Worker using webpack with a lot of polyfills to make it running on browser. 
+We bundle a pyright language server into a Web Worker using webpack with a lot of polyfills to make it running on browser. 
 The pyright server worker is built with pyright source code version `1.1.386` to access its internal modules.
 
-The filesystem that pyright required are provided by [ZenFS](https://github.com/westerndigitalcorporation/zenfs)
+The filesystem that pyright server required are provided by [ZenFS](https://github.com/westerndigitalcorporation/zenfs)
 
-Thanks [Pyright Playground](https://github.com/erictraut/pyright-playground) as a example to implement language provider with `pyright` for `monaco-editor`
+Thanks [Pyright Playground](https://github.com/erictraut/pyright-playground) as an example to implement language provider with `pyright` for `monaco-editor`
 
 ## Build
 
@@ -24,6 +29,12 @@ npm run build
 ## Usage
 
 See `/examples/webpack/src/index.ts` for example.
+
+This require a bundle tool (webpack, etc.) to distribute on web.
+
+```shell
+npm install monaco-pyright-lsp
+```
 
 ```typescript
 import * as monaco from "monaco-editor";
