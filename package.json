@@ -1,6 +1,6 @@
 {
   "name": "monaco-pyright-lsp",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "Make a Pyright language server running on browser and provide language features to Monaco Editor",
   "main": "./dist/index.js",
   "scripts": {

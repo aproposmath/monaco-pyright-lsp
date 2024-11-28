@@ -23,7 +23,7 @@ Try it on browser: <https://sardinefish.github.io/monaco-pyright-lsp/>
 We bundle a pyright language server into a Web Worker using webpack with a lot of polyfills to make it running on browser. 
 The pyright server worker is built with pyright source code version `1.1.386` to access its internal modules.
 
-The filesystem that pyright server required are provided by [ZenFS](https://github.com/westerndigitalcorporation/zenfs)
+The filesystem that pyright server required are provided by [ZenFS](https://github.com/zen-fs/core)
 
 Thanks [Pyright Playground](https://github.com/erictraut/pyright-playground) as an example to implement language provider with `pyright` for `monaco-editor`
 
