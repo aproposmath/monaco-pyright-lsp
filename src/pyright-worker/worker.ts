@@ -21,13 +21,13 @@ import { _Zip as Zip, ZipFS } from "@zenfs/zip";
 import path from "path";
 import { InitializeMsg, MsgInitServer, MsgServerInitialized, MsgServerLoaded, UserFolder } from "../message.js";
 
-async function initFs()
+async function initFs(typeshedFallbackZip?: ArrayBuffer)
 {
     await ZenFS.configure({
         mounts: {
             "/typeshed-fallback": {
                 backend: Zip,
-                data: typeshedZip,
+                data: typeshedFallbackZip || typeshedZip,
             },
             "/tmp": ZenFS.InMemory,
         }
@@ -61,6 +61,7 @@ function createUserFiles(parentPath: string, folder: UserFolder)
 
 async function handleInitServer(msg: MsgInitServer)
 {
+    await initFs(msg.typeshedFallback);
     createUserFiles("/typings", msg.userFiles);
 
     postMessage(<MsgServerInitialized>{
@@ -85,7 +86,7 @@ async function handleInitServer(msg: MsgInitServer)
 
 async function init()
 {
-    await initFs();
+    // await initFs();
 
 
     postMessage(<MsgServerLoaded>{

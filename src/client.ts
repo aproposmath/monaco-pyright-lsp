@@ -96,13 +96,14 @@ export class LspClient
         this.workerLoadedPromise = this.waitServerInitializeMsg("serverLoaded");
     }
 
-    public async initialize(projectPath: string, userFiles: UserFolder = {})
+    public async initialize(projectPath: string, userFiles: UserFolder = {}, typeshedFallback: ArrayBuffer| undefined = undefined)
     {
         await this.workerLoadedPromise;
 
         this.worker.postMessage(<MsgInitServer>{
             type: "initServer",
             userFiles: userFiles,
+            typeshedFallback: typeshedFallback
         });
 
         await this.waitServerInitializeMsg("serverInitialized");

@@ -43,7 +43,5 @@ async function init()
 
 
     await pyrightProvider.setupDiagnostics(editorInstance);
-
-    pyrightProvider.setupDiagnostics
 }
 init();

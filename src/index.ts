@@ -7,7 +7,7 @@ import { UserFolder } from "./message";
 
 type MonacoModule = typeof _monaco;
 
-interface MonacoPyrightProviderFeatures
+export interface MonacoPyrightProviderFeatures
 {
     hover: boolean,
     completion: boolean,
@@ -17,11 +17,12 @@ interface MonacoPyrightProviderFeatures
     findDefinition: boolean,
 }
 
-interface MonacoPyrightOptions
+export interface MonacoPyrightOptions
 {
     features: Partial<MonacoPyrightProviderFeatures>,
     builtInTypeshed: boolean,
     typeStubs?: string | UserFolder,
+    typeshedFallback?: ArrayBuffer,
 
     /** Minimal time in milliseconds to wait before sending next update notification */
     diagnosticsInterval: number,
@@ -72,7 +73,7 @@ export class MonacoPyrightProvider
             typeStubsFolder = options.typeStubs;
         }
 
-        await this.lspClient.initialize("/", typeStubsFolder);
+        await this.lspClient.initialize("/", typeStubsFolder, this.options.typeshedFallback);
         await this.lspClient.updateSettings();
 
         if (options.features.hover)
