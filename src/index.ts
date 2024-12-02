@@ -20,9 +20,12 @@ export interface MonacoPyrightProviderFeatures
 export interface MonacoPyrightOptions
 {
     features: Partial<MonacoPyrightProviderFeatures>,
-    builtInTypeshed: boolean,
+
+    /** Type stubs for additional module */
     typeStubs?: string | UserFolder,
-    typeshedFallback?: ArrayBuffer,
+
+    /** Set a custom typeshed zipfile. Set `false` to disable typeshed */
+    typeshed?: ArrayBuffer | false,
 
     /** Minimal time in milliseconds to wait before sending next update notification */
     diagnosticsInterval: number,
@@ -37,7 +40,6 @@ const defaultOptions: MonacoPyrightOptions = {
         rename: true,
         findDefinition: true,
     },
-    builtInTypeshed: true,
     typeStubs: undefined,
     diagnosticsInterval: 1000,
 };
@@ -73,7 +75,7 @@ export class MonacoPyrightProvider
             typeStubsFolder = options.typeStubs;
         }
 
-        await this.lspClient.initialize("/", typeStubsFolder, this.options.typeshedFallback);
+        await this.lspClient.initialize("/", typeStubsFolder, this.options.typeshed);
         await this.lspClient.updateSettings();
 
         if (options.features.hover)

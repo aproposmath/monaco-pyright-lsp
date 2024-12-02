@@ -17,18 +17,21 @@ import { Buffer } from "buffer"
 import { Uri } from "pyright/packages/pyright-internal/src/common/uri/uri";
 import { FileUri } from "pyright/packages/pyright-internal/src/common/uri/fileUri";
 import { BaseUri } from "pyright/packages/pyright-internal/src/common/uri/baseUri";
-import { _Zip as Zip, ZipFS } from "@zenfs/zip";
+import { ZipFS, Zip } from "@zenfs/archives";
 import path from "path";
 import { InitializeMsg, MsgInitServer, MsgServerInitialized, MsgServerLoaded, UserFolder } from "../message.js";
 
-async function initFs(typeshedFallbackZip?: ArrayBuffer)
+async function initFs(typeshedFallbackZip?: ArrayBuffer | false)
 {
     await ZenFS.configure({
         mounts: {
-            "/typeshed-fallback": {
-                backend: Zip,
-                data: typeshedFallbackZip || typeshedZip,
-            },
+            "/typeshed-fallback":
+                typeshedFallbackZip === false
+                    ? ZenFS.InMemory
+                    : {
+                        backend: Zip,
+                        data: typeshedFallbackZip || typeshedZip,
+                    },
             "/tmp": ZenFS.InMemory,
         }
     });

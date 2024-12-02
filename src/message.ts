@@ -12,7 +12,7 @@ export interface MsgInitServer
 {
     type: "initServer",
     userFiles: UserFolder,
-    typeshedFallback: ArrayBuffer | undefined,
+    typeshedFallback: ArrayBuffer | false | undefined,
 }
 
 export interface MsgServerInitialized
