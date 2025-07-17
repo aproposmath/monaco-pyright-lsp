@@ -1,13 +1,13 @@
 # Python Language Server for Monaco Editor on Browser
 
-![GitHub License](https://img.shields.io/github/license/SardineFish/monaco-pyright-lsp)
-[![Publish to npm](https://github.com/SardineFish/monaco-pyright-lsp/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/SardineFish/monaco-pyright-lsp/actions/workflows/npm-publish.yml)
+![GitHub License](https://img.shields.io/github/license/aproposmath/monaco-pyright-lsp)
+[![Publish to npm](https://github.com/aproposmath/monaco-pyright-lsp/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/aproposmath/monaco-pyright-lsp/actions/workflows/npm-publish.yml)
 ![NPM Version](https://img.shields.io/npm/v/monaco-pyright-lsp)
 
 
 Make a [Pyright](https://github.com/microsoft/pyright) python language server running on browser and provide language features to [Monaco Editor](https://github.com/microsoft/monaco-editor). 
 
-Try it on browser: <https://sardinefish.github.io/monaco-pyright-lsp/>
+Try it on browser: <https://aproposmath.github.io/monaco-pyright-lsp/>
 
 ## Features
 
